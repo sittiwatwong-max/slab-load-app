@@ -1,127 +1,136 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
-# 1. ตั้งค่าหน้าตาเบราว์เซอร์และไอคอน (ส่วนที่คุณต้องการเปลี่ยน)
-# ผมใส่ลิงก์รูปไอคอนวิศวกรรม (ตึก/เครน) เพื่อให้เวลาติดตั้งบน Desktop จะได้รูปที่สวยขึ้น
-st.set_page_config(
-    page_title="Slab Load Design Pro", 
-    page_icon="https://cdn-icons-png.flaticon.com/512/4342/4342728.png", 
-    layout="centered"
-)
+# --- 1. SETTING & THEME ---
+st.set_page_config(page_title="SlabMaster Pro", page_icon="🏗️", layout="wide")
 
-# 2. ปรับแต่ง CSS เพื่อความสวยงาม (ทำให้หน้าตาดูเหมือนแอปจริงๆ)
 st.markdown("""
     <style>
-    .main {
-        background-color: #f8f9fa;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    
+    .main { background-color: #f4f7f9; }
+    .stMetric { 
+        background: white; padding: 20px; border-radius: 15px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #eee;
     }
-    .stButton>button {
-        width: 100%;
-        border-radius: 10px;
-        height: 3em;
-        background-color: #007bff;
-        color: white;
-        font-weight: bold;
+    .calc-card {
+        background: #ffffff; padding: 25px; border-radius: 20px;
+        border-left: 8px solid #007bff; box-shadow: 0 10px 25px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. ส่วนหัวของแอป
-st.title("🏗️ Slab Load Distribution Pro")
-st.write("โปรแกรมคำนวณการถ่ายแรงพื้นลงสู่คานเบื้องต้น")
-st.markdown("---")
-
-# 4. ส่วนรับข้อมูล (Input)
-st.subheader("📥 ข้อมูลการออกแบบ (Input Data)")
-col1, col2 = st.columns(2)
-
-with col1:
-    st.info("💡 น้ำหนักบรรทุก")
-    dl = st.number_input("Dead Load (kN/m²)", value=3.0, step=0.1, format="%.2f")
-    ll = st.number_input("Live Load (kN/m²)", value=2.0, step=0.1, format="%.2f")
-
-with col2:
-    st.info("📏 ขนาดแผ่นพื้น")
-    L = st.number_input("ความยาวด้านยาว L (m)", value=4.0, step=0.1, format="%.2f")
-    B = st.number_input("ความกว้างด้านสั้น B (m)", value=2.0, step=0.1, format="%.2f")
-
-column_pos = st.selectbox("ตำแหน่งเสา (Column Position)", ["Corner", "Edge", "Interior"])
-
-# 5. ส่วนการคำนวณ (Calculation)
-st.markdown("---")
-if st.button("🚀 คำนวณและวิเคราะห์ผล"):
+# --- 2. SIDEBAR INPUTS ---
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/4342/4342728.png", width=80)
+    st.title("SlabMaster Pro")
+    st.subheader("⚙️ Configuration")
     
-    # คำนวณค่าพื้นฐาน
-    total_w = dl + ll
-    ratio = L / B if B > 0 else 0
+    with st.expander("Dimensions (m)", expanded=True):
+        L_long = st.number_input("Long Span (L)", value=5.0, min_value=0.1)
+        L_short = st.number_input("Short Span (B)", value=3.0, min_value=0.1)
     
-    # วิเคราะห์ประเภทพื้น
-    if ratio > 2.0:
-        slab_type = "One-way Slab (พื้นทางเดียว)"
-        result_color = "orange"
-        load_dist = "ถ่ายแรงลงคานด้านยาว 2 ด้าน"
-    else:
-        slab_type = "Two-way Slab (พื้นสองทาง)"
-        result_color = "green"
-        load_dist = "ถ่ายแรงลงคาน 4 ด้าน (สามเหลี่ยม/คางหมู)"
+    with st.expander("Loading (kN/m²)", expanded=True):
+        dead_load = st.number_input("Dead Load", value=3.5)
+        live_load = st.number_input("Live Load", value=2.0)
+    
+    safety_factor = st.slider("Safety Factor (Ultimate)", 1.0, 2.0, 1.4)
+    run_calc = st.button("🚀 ANALYZE STRUCTURE", use_container_width=True)
 
-    # แสดงผลลัพธ์แบบ Metrics
-    st.subheader("📊 ผลการวิเคราะห์ (Results)")
-    m_col1, m_col2, m_col3 = st.columns(3)
-    m_col1.metric("Total Load", f"{total_w:.2f} kN/m²")
-    m_col2.metric("L/B Ratio", f"{ratio:.2f}")
-    m_col3.metric("Type", "One-way" if ratio > 2 else "Two-way")
+# --- 3. LOGIC & CALCULATIONS ---
+# ปรับด้านให้ถูกต้องเสมอ
+L = max(L_long, L_short)
+B = min(L_long, L_short)
+total_w = (dead_load + live_load) * safety_factor
+area = L * B
+total_load_on_slab = total_w * area
+ratio = L / B
 
-    st.markdown(f"🔔 วิเคราะห์พบว่าเป็น: **:{result_color}[{slab_type}]**")
-    
-    # แสดงตารางสรุป
-    st.write("### 📝 สรุปรายละเอียด")
-    summary = {
-        "หัวข้อ": ["น้ำหนักรวม (w)", "อัตราส่วนด้าน", "รูปแบบการถ่ายแรง", "ตำแหน่งเสา"],
-        "รายละเอียด": [f"{total_w:.2f} kN/m²", f"{ratio:.2f}", load_dist, column_pos]
-    }
-    st.table(pd.DataFrame(summary))
+# คำนวณ Load ลงเสา (4 ต้น) - แบบง่ายคือหาร 4 แต่เชิงลึกจะกระจายตามพื้นที่รับผิดชอบ
+# ในที่นี้คือ 1 slab panel เสาแต่ละต้นรับ 1/4 ของ Slab
+load_per_column = total_load_on_slab / 4
 
-    # 6. วาดรูปการกระจายแรง (Diagram)
-    st.write("### 📐 Load Distribution Diagram")
-    fig, ax = plt.subplots(figsize=(6, 4))
-    
-    # วาดรูปพื้น
-    rect = plt.Rectangle((0, 0), L, B, linewidth=2, edgecolor='#333', facecolor='#e1f5fe')
-    ax.add_patch(rect)
-    
-    # วาดเส้นแบ่งแรง (Tributary Area)
-    if ratio <= 2.0:
-        # เส้นทแยงมุมสำหรับ Two-way
-        ax.plot([0, B/2], [0, B/2], 'r--', lw=1)
-        ax.plot([L, L-B/2], [0, B/2], 'r--', lw=1)
-        ax.plot([0, B/2], [B, B-B/2], 'r--', lw=1)
-        ax.plot([L, L-B/2], [B, B-B/2], 'r--', lw=1)
-        ax.plot([B/2, L-B/2], [B/2, B/2], 'r--', lw=1)
-        ax.plot([B/2, L-B/2], [B-B/2, B-B/2], 'r--', lw=1)
-    else:
-        # เส้นขนานสำหรับ One-way
-        ax.axhline(B/2, color='r', linestyle='--', lw=1)
+# --- 4. MAIN INTERFACE ---
+st.markdown(f'<div class="calc-card"><h1>Analysis Dashboard</h1><p>Project: Slab-to-Column Distribution Study</p></div>', unsafe_allow_html=True)
+st.write("##")
 
-    ax.set_xlim(-0.5, L + 0.5)
-    ax.set_ylim(-0.5, B + 0.5)
-    ax.set_aspect('equal')
-    ax.axis('off')
+if run_calc:
+    tab1, tab2, tab3 = st.tabs(["📊 Overview", "📐 Structural Diagram", "📑 Report"])
     
-    # ใส่ข้อความบอกขนาด
-    ax.text(L/2, -0.2, f"Length {L}m", ha='center', fontsize=10)
-    ax.text(-0.2, B/2, f"Width {B}m", va='center', rotation=90, fontsize=10)
-    
-    st.pyplot(fig)
-    st.balloons() # เอฟเฟกต์แสดงความยินดี
+    with tab1:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Ultimate Load", f"{total_w:.2f} kN/m²")
+        c2.metric("Total Weight", f"{total_load_on_slab:.2f} kN")
+        c3.metric("Ratio L/B", f"{ratio:.2f}", delta="Two-way" if ratio <= 2 else "One-way")
+        c4.metric("Load per Column", f"{load_per_column:.2f} kN", delta_color="inverse")
+
+        st.write("### 🪜 Beam Distribution (EUDL)")
+        if ratio <= 2:
+            w_short = (total_w * B) / 3
+            w_long = (total_w * B / 3) * ((3 - (B/L)**2) / 2)
+        else:
+            w_short = 0
+            w_long = (total_w * B) / 2
+        
+        bc1, bc2 = st.columns(2)
+        bc1.info(f"**Long Beam Load:** {w_long:.2f} kN/m")
+        bc2.warning(f"**Short Beam Load:** {w_short:.2f} kN/m")
+
+    with tab2:
+        st.write("### 🏗️ Tributary Area & Column Positions")
+        fig, ax = plt.subplots(figsize=(10, 6), dpi=100)
+        fig.patch.set_facecolor('#f4f7f9')
+        
+        # Draw Slab
+        rect = plt.Rectangle((0, 0), L, B, fc='#e3f2fd', ec='#0d47a1', lw=2, alpha=0.6)
+        ax.add_patch(rect)
+
+        # Draw Columns (เสา 4 ต้น)
+        cols_x = [0, L, L, 0]
+        cols_y = [0, 0, B, B]
+        ax.scatter(cols_x, cols_y, s=400, c='#263238', marker='s', zorder=5, label='Columns')
+
+        # Draw Tributary Lines (เส้นแบ่งแรงลงเสา)
+        ax.axhline(B/2, color='#546e7a', ls='--', lw=1, alpha=0.5)
+        ax.axvline(L/2, color='#546e7a', ls='--', lw=1, alpha=0.5)
+
+        # Annotate Columns with Load
+        for i, (x, y) in enumerate(zip(cols_x, cols_y)):
+            ax.annotate(f"C{i+1}\n{load_per_column:.1f} kN", (x, y), 
+                        xytext=(15, 15) if x==0 else (-45, 15), 
+                        textcoords='offset points', fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.8))
+
+        # Styling
+        ax.set_aspect('equal')
+        ax.set_xlim(-1, L+1)
+        ax.set_ylim(-1, B+1)
+        plt.title(f"Load Distribution Path (Type: {'Two-way' if ratio <=2 else 'One-way'})", pad=20)
+        plt.axis('off')
+        st.pyplot(fig)
+
+    with tab3:
+        st.subheader("📋 Calculation Summary")
+        report_df = pd.DataFrame({
+            "Parameter": ["Slab Area", "Total Ultimate Load", "Slab Classification", "Column Load (C1-C4)"],
+            "Value": [f"{area:.2f} m²", f"{total_load_on_slab:.2f} kN", "Two-way System" if ratio <=2 else "One-way System", f"{load_per_column:.2f} kN per column"],
+            "Unit": ["m²", "kN", "Type", "kN"]
+        })
+        st.table(report_df)
+        
+        st.download_button("📥 Export CSV", report_df.to_csv().encode('utf-8'), "slab_analysis.csv", "text/csv")
 
 else:
-    st.info("กรอกข้อมูลด้านบนแล้วกดปุ่ม 'คำนวณและวิเคราะห์ผล'")
+    # Landing State
+    st.markdown("""
+        <div style="text-align: center; padding: 50px; border: 2px dashed #ccc; border-radius: 20px;">
+            <h2 style="color: #666;">Ready for Engineering Analysis</h2>
+            <p>กรอกข้อมูลที่แถบด้านข้างแล้วกดปุ่ม <b>Analyze Structure</b> เพื่อเริ่มต้น</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-# ส่วนท้าย
 st.markdown("---")
-st.caption("Developed for Engineering Purposes | Version 2.0")
-
-
-  
+st.markdown("<p style='text-align: center; color: #999;'>SlabMaster Pro v3.0 | Modern Structural UI</p>", unsafe_allow_html=True)
